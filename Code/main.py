@@ -17,6 +17,8 @@ TOTALELEMENTS = int(NELEMENTS * (1+2*BOUNDARY) )
 
 MAXSTEPS = 100
 
+np.random.seed(42)
+
 def createCDF( sigma1, value ):
     rv = norm( 0.0, sigma1 )
     x = np.linspace( -1 - BOUNDARY, 1 + BOUNDARY, TOTALELEMENTS)
@@ -40,7 +42,7 @@ def drawFromPDF( x, pdf ):
         sum = sum + pdf[i]
         if ( i >= len(pdf ) or sum >= u ):
             ind = i
-            print('u', u, 'ind', ind, 'x[ind]', x[ind] )
+            #print('u', u, 'ind', ind, 'x[ind]', x[ind] )
             break
     return x[ind]
 
@@ -61,39 +63,99 @@ def experiment( x, y ):
 sigmas = [ 1.0, 1.0, 0.5, 1.0]
 values = [ 0.05, 0.01, 0.05, 0.06 ]
 
-def main( argv = None ):
-    if argv is None:
-        argv = sys.argv
+def drawPDF( sigmas, values ):
     fig = plt.figure()
     for i in range(4):
         x, y = createCDF(sigmas[i], values[i])
         ax = fig.add_subplot(2,2,i+1)
+        #ax.set_title('Model M')
         ax.set_xlim((-1 - BOUNDARY, 1 + BOUNDARY))
         ax.set_ylim((0, 0.1))
-        ax.plot(x,y,label='σ2={0}, f={1}'.format(sigmas[i], values[i]))
+        ax.plot(x,y,label='σ2={0}, e_c={1}'.format(sigmas[i], values[i]), linewidth=3,)
         ax.legend()
     print(sum(y))
-    fig.savefig('pdf2.png')
+    fig.savefig('pdf2.eps')
     plt.show()
 
+def drawHist( sigmas, values, NEXPERIMENTS=1000 ):
     fig = plt.figure()
     for i in range(4):
         ax=fig.add_subplot(2,2,i+1)
         x, y = createCDF(sigmas[i], values[i])
 
         count = []
-        for e in range(1000):
+        for e in range(NEXPERIMENTS):
             t = experiment(x, y)
             count = count + [t]
-        ax.hist(count, label='σ2={0}, f={1}'.format(sigmas[i], values[i]))
+        counts, bins, patches = ax.hist(count, 50, label='σ2={0}, e_c={1:5.2f}'.format(sigmas[i], values[i]) )
+
+        print('sum', np.sum(counts), 'counts', counts, 'sum', np.sum(bins), 'bins', bins)
+        sum = 0
+        for j in range(len(counts)):
+            sum = sum + counts[j]
+            if sum > 0.95 * NEXPERIMENTS:
+                p95 = j
+                break
         m = max(count)
-        ax.plot([m,m], [0,1000],'b-', linewidth=3, label='max={0}'.format(m))
-        ax.set_xlim((0,50))
+        ax.plot([m,m], [0,1000],'b-', linewidth=3, label='max={0:5.2f}'.format(m))
+        ax.plot([bins[p95],bins[p95]],[0,1000], 'r--', linewidth=3, label='95%={0:5.2f}'.format(bins[p95]))
+        ax.set_xlim((0,100))
         ax.set_ylim((0,500))
         ax.legend()
 
-    fig.savefig( 'hist2.png')
+    fig.savefig( 'hist2.eps')
     plt.show()
 
+def drawExperiment( sigma, value, steps ):
+    fig = plt.figure()
+    ax=fig.add_subplot(1,1,1)
+    x, y = createCDF(sigma, value)
+
+    logs = [ [], [], []  ]
+
+    while len(logs[0]) <= 0 or len(logs[1]) <= 0 or len(logs[2]) <= 0:
+        print( len(logs[0]), len(logs[1]), len(logs[2]) )
+        log = [0]
+        disp = 0
+        for i in range( steps ):
+            z = drawFromPDF(x, y)
+            if (z <= -1) or (z >= 1):
+                if ( len(log) > steps//2):
+                    if ( disp < 0 ):
+                        z = +1
+                    else:
+                        z = -1
+                    log.append( z )
+                    logs[1] = log
+                break
+            disp = disp + z
+            if (disp <= -1) or (disp >= 1):
+                if ( len(log) > steps//2):
+                    log.append(disp)
+                    logs[0] = log
+                break
+            log.append( disp )
+        if len(log) >= steps:
+            logs[2] = log
+
+    ax.plot( logs[0], 'g--', linewidth=3, label='Drift Error' )
+    ax.plot(logs[1], 'r-*', linewidth=3, label='Critical Error')
+    ax.plot(logs[2], 'b-', linewidth=3, label='No Error')
+    ax.set_title( 'Trace of Experiments with σ2 = {0} and e_c = {1}'.format(sigma, value) )
+    ax.legend()
+
+    fig.savefig( 'plot2.eps')
+    plt.show()
+
+def main( argv = None ):
+    if argv is None:
+        argv = sys.argv
+    #drawPDF( sigmas, values )
+
+    sigmas = [0.01, 0.01, 0.5, 1.0]
+    values = [0.0, 0.1, 0.02, 0.06]
+
+    drawHist( sigmas, values )
+    #drawExperiment( 2.0, 0.03, 25 )
 if __name__ == '__main__':
     main()
