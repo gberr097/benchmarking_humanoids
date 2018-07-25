@@ -19,20 +19,39 @@ MAXSTEPS = 100
 
 np.random.seed(42)
 
-def createCDF( sigma1, value ):
+# def createCDF( sigma1, value ):
+#     rv = norm( 0.0, sigma1 )
+#     x = np.linspace( -1 - BOUNDARY, 1 + BOUNDARY, TOTALELEMENTS)
+#     y = rv.pdf(x)
+#     print('sum pdf', sum(y) )
+#     #thres = 1 - norm.cdf(fatal)
+#     #print('thres', thres )
+#     lim1 = int(BOUNDARY * NELEMENTS)
+#     lim2 = int( TOTALELEMENTS - 1 - int(BOUNDARY*NELEMENTS) )
+#     print('NELEMENTS', NELEMENTS, 'TOTALELEMENTS', TOTALELEMENTS, 'lim1', lim1, 'lim2', lim2)
+#     y[0:lim1] = value/(2*BOUNDARY)
+#     y[lim2:] = value/(2*BOUNDARY)
+#     print(rv.cdf(-1), rv.cdf(1), rv.cdf(1) - rv.cdf(-1) )
+#     y = y/np.sum(y)
+#     return x,y
+
+def createCDF( sigma1, value, nelements, boundary ):
     rv = norm( 0.0, sigma1 )
-    x = np.linspace( -1 - BOUNDARY, 1 + BOUNDARY, TOTALELEMENTS)
+    x = np.linspace( -1 - boundary, 1 + boundary, int( nelements + 2*0.1 * nelements ) )
     y = rv.pdf(x)
-    print('sum pdf', sum(y) )
     #thres = 1 - norm.cdf(fatal)
     #print('thres', thres )
-    lim1 = int(BOUNDARY * NELEMENTS)
-    lim2 = int( TOTALELEMENTS - 1 - int(BOUNDARY*NELEMENTS) )
-    print('NELEMENTS', NELEMENTS, 'TOTALELEMENTS', TOTALELEMENTS, 'lim1', lim1, 'lim2', lim2)
-    y[0:lim1] = value/(2*BOUNDARY)
-    y[lim2:] = value/(2*BOUNDARY)
-    print(rv.cdf(-1), rv.cdf(1), rv.cdf(1) - rv.cdf(-1) )
-    y = y/np.sum(y)
+    lim1 = int(boundary * nelements)
+    lim2 = int( len(x) - 1 - int(boundary * nelements) )
+    #weight = norm.cdf(1) - norm.cdf(-1)
+    weight = sum(y[lim1:lim2])
+    print('w', weight)
+    y = y/weight * (1-value)
+    print('sum(y)', sum(y), 'sum2', sum(y[lim1:lim2]) )
+    weightB = 2*boundary
+    y[0:lim1] = value/(2*lim1)
+    y[lim2:] = value/(2*lim1)
+    print('sum[0:{0}]={1}, sum[{0}:{2}]={3}, sum[{2}:{4}={5}, sum[0:{4}]={6}'.format(lim1, sum(y[0:lim1]), lim2, sum(y[lim1:lim2]), len(y), sum(y[lim2:]), sum(y[0:])))
     return x,y
 
 def drawFromPDF( x, pdf ):
@@ -66,7 +85,7 @@ values = [ 0.05, 0.01, 0.05, 0.06 ]
 def drawPDF( sigmas, values ):
     fig = plt.figure()
     for i in range(4):
-        x, y = createCDF(sigmas[i], values[i])
+        x, y = createCDF(sigmas[i], values[i], 100, 0.1)
         ax = fig.add_subplot(2,2,i+1)
         #ax.set_title('Model M')
         ax.set_xlim((-1 - BOUNDARY, 1 + BOUNDARY))
@@ -81,13 +100,13 @@ def drawHist( sigmas, values, NEXPERIMENTS=1000 ):
     fig = plt.figure()
     for i in range(4):
         ax=fig.add_subplot(2,2,i+1)
-        x, y = createCDF(sigmas[i], values[i])
+        x, y = createCDF(sigmas[i], values[i],100, 0.1)
 
         count = []
         for e in range(NEXPERIMENTS):
             t = experiment(x, y)
             count = count + [t]
-        counts, bins, patches = ax.hist(count, 50, label='σ2={0}, e_c={1:5.2f}'.format(sigmas[i], values[i]) )
+        counts, bins, patches = ax.hist(count, 10, label='σ2={0}, e_c={1:5.2f}'.format(sigmas[i], values[i]) )
 
         print('sum', np.sum(counts), 'counts', counts, 'sum', np.sum(bins), 'bins', bins)
         sum = 0
@@ -109,7 +128,7 @@ def drawHist( sigmas, values, NEXPERIMENTS=1000 ):
 def drawExperiment( sigma, value, steps ):
     fig = plt.figure()
     ax=fig.add_subplot(1,1,1)
-    x, y = createCDF(sigma, value)
+    x, y = createCDF(sigma, value, 100, 0.1)
 
     logs = [ [], [], []  ]
 
@@ -150,12 +169,14 @@ def drawExperiment( sigma, value, steps ):
 def main( argv = None ):
     if argv is None:
         argv = sys.argv
-    #drawPDF( sigmas, values )
 
-    sigmas = [0.01, 0.01, 0.5, 1.0]
-    values = [0.0, 0.1, 0.02, 0.06]
+    sigmas = [ 0.5, 0.5, 1.0, 0.01 ]
+    values = [ 0.02, 0.01, 0.001, 0.01 ]
+
+    drawPDF( sigmas, values )
 
     drawHist( sigmas, values )
     #drawExperiment( 2.0, 0.03, 25 )
+
 if __name__ == '__main__':
     main()
